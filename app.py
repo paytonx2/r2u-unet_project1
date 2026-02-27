@@ -7,9 +7,9 @@ from flask_cors import CORS
 from tensorflow.keras import backend as K
 
 app = Flask(__name__)
-CORS(app) # อนุญาตให้ Vercel เรียกใช้งานได้
+CORS(app) # สำคัญมาก: เพื่อให้ Vercel เรียกข้ามโดเมนได้
 
-# ต้องใส่ฟังก์ชัน Loss ที่คุณเขียนไว้ด้วย ไม่งั้นจะโหลดโมเดลไม่ได้
+# --- Custom Functions สำหรับโมเดล R2U-Net ---
 def dice_coeff(y_true, y_pred, smooth=1e-6):
     y_true_f = K.flatten(y_true)
     y_pred_f = K.flatten(y_pred)
@@ -22,31 +22,49 @@ def dice_loss(y_true, y_pred):
 def combined_loss(y_true, y_pred):
     return 0.5 * tf.keras.losses.binary_crossentropy(y_true, y_pred) + 0.5 * dice_loss(y_true, y_pred)
 
-# โหลดโมเดล (ใช้ compile=False เพื่อประหยัดทรัพยากรตอนโหลด)
-model = tf.keras.models.load_model('model_cnn.h5', 
+# --- Load Model ---
+MODEL_PATH = 'model_cnn.h5'
+model = tf.keras.models.load_model(MODEL_PATH, 
     custom_objects={'dice_coeff': dice_coeff, 'dice_loss': dice_loss, 'combined_loss': combined_loss},
     compile=False)
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    file = request.files['image']
-    img_bytes = np.frombuffer(file.read(), np.uint8)
-    img = cv2.imdecode(img_bytes, cv2.IMREAD_COLOR)
-    
-    # Preprocessing
-    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    img_input = cv2.resize(img_rgb, (128, 128))
-    img_input = img_input.astype('float32') / 255.0
-    img_input = np.expand_dims(img_input, axis=0)
+    try:
+        file = request.files['image']
+        conf_threshold = float(request.form.get('conf_threshold', 0.35))
+        px_threshold = int(request.form.get('px_threshold', 15))
 
-    # Predict
-    pred_mask = model.predict(img_input)[0]
-    mask_binary = (pred_mask > 0.35).astype(np.uint8)
-    pixel_count = int(np.sum(mask_binary))
-    
-    status = "MISSING" if pixel_count >= 15 else "GOOD"
-    
-    return jsonify({'status': status, 'pixel_count': pixel_count})
+        # อ่านไฟล์ภาพ
+        img_bytes = np.frombuffer(file.read(), np.uint8)
+        img = cv2.imdecode(img_bytes, cv2.IMREAD_COLOR)
+        h_orig, w_orig = img.shape[:2]
+
+        # Preprocessing
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img_input = cv2.resize(img_rgb, (128, 128))
+        img_input = img_input.astype('float32') / 255.0
+        img_input = np.expand_dims(img_input, axis=0)
+
+        # Inference
+        pred_mask = model.predict(img_input, verbose=0)[0]
+        mask_binary = (pred_mask > conf_threshold).astype(np.uint8)
+        
+        # Resize mask กลับมาขนาดจริงเพื่อตรวจนับพิกเซล
+        mask_full = cv2.resize(mask_binary, (w_orig, h_orig), interpolation=cv2.INTER_NEAREST)
+        pixel_count = int(np.sum(mask_full))
+        
+        status = "MISSING" if pixel_count >= px_threshold else "GOOD"
+        
+        return jsonify({
+            'status': status,
+            'pixel_count': pixel_count,
+            'success': True
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000)
+    # Render จะกำหนด PORT ให้เองผ่าน Environment Variable
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
