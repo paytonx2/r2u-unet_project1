@@ -65,6 +65,6 @@ def predict():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
-    # Render จะกำหนด PORT ให้เองผ่าน Environment Variable
-    port = int(os.environ.get("PORT", 10000))
+    # Hugging Face Spaces ใช้ port 7860 เป็นค่าเริ่มต้น
+    port = int(os.environ.get("PORT", 7860))
     app.run(host='0.0.0.0', port=port)
