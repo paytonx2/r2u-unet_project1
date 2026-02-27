@@ -1,8 +1,6 @@
-streamlit
-tensorflow-cpu
-numpy
+flask
+flask-cors
+tensorflow==2.15.0
 opencv-python-headless
-pandas
-scikit-learn
-matplotlib
-seaborn
+numpy<2.0.0
+gunicorn
