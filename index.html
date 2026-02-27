@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Defect Detection</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-slate-900 text-white min-h-screen font-sans">
+
+    <div class="container mx-auto px-4 py-12 max-w-4xl">
+        <div class="text-center mb-12">
+            <h1 class="text-4xl font-extrabold mb-4 bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
+                R2U-Net Defect Detection
+            </h1>
+            <p class="text-slate-400">ระบบตรวจจับจุดบกพร่องชิ้นส่วนยานยนต์อัตโนมัติ</p>
+        </div>
+
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-8 shadow-2xl">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                
+                <div class="space-y-6">
+                    <label class="block text-sm font-medium text-slate-300">อัปโหลดรูปภาพชิ้นส่วน</label>
+                    <div id="dropzone" class="border-2 border-dashed border-slate-600 rounded-xl p-8 text-center hover:border-blue-500 transition-colors cursor-pointer bg-slate-850">
+                        <input type="file" id="fileInput" class="hidden" accept="image/*">
+                        <i class="fas fa-cloud-upload-alt text-4xl mb-4 text-slate-500"></i>
+                        <p id="fileName" class="text-slate-400 text-sm">คลิกเพื่อเลือกไฟล์ หรือลากมาวางที่นี่</p>
+                    </div>
+                    
+                    <button onclick="analyzeImage()" id="btnAnalyze" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-all flex items-center justify-center space-x-2">
+                        <span>เริ่มการวิเคราะห์</span>
+                        <i class="fas fa-bolt"></i>
+                    </button>
+                </div>
+
+                <div id="resultCard" class="bg-slate-900/50 rounded-xl p-6 border border-slate-700 hidden">
+                    <h3 class="text-xl font-semibold mb-4 text-blue-400">ผลการวิเคราะห์</h3>
+                    <div id="statusBadge" class="text-center py-4 rounded-lg text-2xl font-black mb-4">
+                        ---
+                    </div>
+                    <div class="space-y-3 text-sm">
+                        <div class="flex justify-between border-b border-slate-800 pb-2">
+                            <span class="text-slate-500">Pixel Count:</span>
+                            <span id="pixelVal" class="font-mono text-emerald-400">0</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-500">System Status:</span>
+                            <span class="text-emerald-500">Ready</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // *** แก้ URL ตรงนี้เป็นลิงก์ที่คุณได้จาก Render ***
+        const API_URL = "https://your-api-name.onrender.com/predict";
+
+        const fileInput = document.getElementById('fileInput');
+        const dropzone = document.getElementById('dropzone');
+        const fileName = document.getElementById('fileName');
+
+        dropzone.onclick = () => fileInput.click();
+
+        fileInput.onchange = () => {
+            if(fileInput.files.length > 0) fileName.innerText = fileInput.files[0].name;
+        };
+
+        async function analyzeImage() {
+            if (!fileInput.files[0]) return alert("กรุณาเลือกรูปภาพก่อน!");
+
+            const btn = document.getElementById('btnAnalyze');
+            const resultCard = document.getElementById('resultCard');
+            const statusBadge = document.getElementById('statusBadge');
+            const pixelVal = document.getElementById('pixelVal');
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner animate-spin"></i> <span>กำลังประมวลผล...</span>';
+
+            const formData = new FormData();
+            formData.append('image', fileInput.files[0]);
+
+            try {
+                const response = await fetch(API_URL, { method: 'POST', body: formData });
+                const data = await response.json();
+
+                resultCard.classList.remove('hidden');
+                pixelVal.innerText = data.pixel_count;
+
+                if (data.status === "GOOD") {
+                    statusBadge.innerText = "PASS : GOOD";
+                    statusBadge.className = "text-center py-4 rounded-lg text-2xl font-black mb-4 bg-emerald-500/20 text-emerald-400 border border-emerald-500/50";
+                } else {
+                    statusBadge.innerText = "FAIL : MISSING";
+                    statusBadge.className = "text-center py-4 rounded-lg text-2xl font-black mb-4 bg-red-500/20 text-red-400 border border-red-500/50";
+                }
+            } catch (err) {
+                alert("เกิดข้อผิดพลาดในการเชื่อมต่อ API");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<span>เริ่มการวิเคราะห์</span> <i class="fas fa-bolt"></i>';
+            }
+        }
+    </script>
+</body>
+</html>
