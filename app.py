@@ -23,7 +23,7 @@ def combined_loss(y_true, y_pred):
     return 0.5 * tf.keras.losses.binary_crossentropy(y_true, y_pred) + 0.5 * dice_loss(y_true, y_pred)
 
 # --- Load Model ---
-MODEL_PATH = 'model_cnn.h5'
+MODEL_PATH = 'defect_medel.h5'
 model = tf.keras.models.load_model(MODEL_PATH, 
     custom_objects={'dice_coeff': dice_coeff, 'dice_loss': dice_loss, 'combined_loss': combined_loss},
     compile=False)
